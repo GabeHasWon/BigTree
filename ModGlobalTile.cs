@@ -19,7 +19,7 @@ namespace BigTree
                 return false;
             return true;
         }
-
+        
         public bool ActiveType(int i, int j, int t) => Framing.GetTileSafely(i, j).active() && Framing.GetTileSafely(i, j).type == t; //Some helper methods
         public bool SolidTile(int i, int j) => Framing.GetTileSafely(i, j).active() && Main.tileSolid[Framing.GetTileSafely(i, j).type];
     }
