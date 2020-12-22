@@ -1,0 +1,5 @@
+displayName = Big Trees
+author = GabeHasWon
+version = 0.1
+includeSource = true
+hideResources = false

@@ -1,0 +1,5 @@
+Big Trees adds custom framing and growing for...well...big trees.
+--------------
+This default example has only a poorly drawn Purity large tree, but expect more from other mods eventually.
+
+And, if you're a modder, feel free to use this to make your own trees as long as you credit me (GabeHasWon).
