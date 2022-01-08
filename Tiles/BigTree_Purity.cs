@@ -1,17 +1,12 @@
 ﻿using Microsoft.Xna.Framework;
-using System;
-using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using Terraria;
 using Terraria.ID;
 using Terraria.ModLoader;
-using static Terraria.WorldGen;
-using static Terraria.ModLoader.ModContent;
 using Microsoft.Xna.Framework.Graphics;
 using Terraria.Utilities;
-using Terraria.ObjectData;
+using static Terraria.WorldGen;
+using static Terraria.ModLoader.ModContent;
 
 namespace BigTree.Tiles
 {
@@ -25,10 +20,12 @@ namespace BigTree.Tiles
         /// Note: The tops are draw by the origin of the [side]-middle of the trunk, so generally, you'd want to use TreeTopSize.Y / 2 for the top side (and same for the bottom side)</summary>
         private readonly Rectangle BranchSize = new Rectangle(9, 4, 144, 64);
 
+        private static bool CullingTree = false;
+
         public override void SetDefaults()
         {
             minPick = 0; //Not hard to dig, and this doesn't work with axes anyway
-            dustType = DustID.t_LivingWood;//Self explanatory -->
+            dustType = DustID.t_LivingWood; //Self explanatory -->
             soundType = SoundID.Dig;
             drop = ItemID.Wood;
             ModTranslation name = CreateMapEntryName();
@@ -157,14 +154,65 @@ namespace BigTree.Tiles
         /// Note: This is a very long checklist of every possible way to destroy a tile; in short, custom framing. If you want to change something, you might have to rewrite a good amount of it.</summary>
         public override void KillTile(int i, int j, ref bool fail, ref bool effectOnly, ref bool noItem)
         {
-            if (fail) return; //Do nothing if this doesn't kill the tile
-
-            Item.NewItem(new Vector2(i, j) * 16, drop, Main.rand.Next(1, 3)); //Drops extra wood to be proportional to vanilla tree wood loot
+            if (fail)
+                return; //Do nothing if this doesn't kill the tile
 
             Tile t = Framing.GetTileSafely(i, j); //For quick reference
 
-            if (Framing.GetTileSafely(i, j - 1).type == TileType<BigTree_Purity>()) //Kill any tree tiles above self
-                WorldGen.KillTile(i, j - 1);
+            bool FramedTreeTile(int x, int y, params int[] frm)
+            {
+                Tile tile = Framing.GetTileSafely(x, y);
+                return tile.active() && tile.type == Type && frm.Contains(tile.frameX);
+            }
+
+            void CullTree(int x, int startY)
+            {
+                Tile tile = Framing.GetTileSafely(x, startY);
+                while (tile.active() && tile.type == Type)
+                {
+                    WorldGen.KillTile(x, startY, false, false, false);
+                    WorldGen.KillTile(x + 1, startY, false, false, false);
+                    WorldGen.KillTile(x, startY, false, false, false); //I hate this. works tho
+
+                    startY--;
+                    tile = Framing.GetTileSafely(x, startY);
+                }
+            }
+
+            //This if-else statement was written many months after this had all been done. It may deprecate any amount of code below. I don't care.
+            if ((FramedTreeTile(i - 1, j, 0, 198) || FramedTreeTile(i + 1, j, 18, 216)) && Framing.GetTileSafely(i, j - 1).type == TileType<BigTree_Purity>()) //Kill any tree tiles above self if both sides are cut
+            {
+                if (t.frameX == 198) //Kill tile to the left if it's a branch
+                    WorldGen.KillTile(i - 1, j, false, false, false);
+                if (t.frameX == 0 || t.frameX == 198)
+                    t.frameX = 432;
+
+                if (t.frameX == 216)
+                    WorldGen.KillTile(i + 1, j, false, false, false);
+                if (t.frameX == 18 || t.frameX == 216)
+                    t.frameX = 450;
+
+                fail = true;
+                return; //Change the frame to the wedge frame and stop this from dying
+            }
+            else if ((FramedTreeTile(i - 1, j, 432) || FramedTreeTile(i + 1, j, 450)) && Framing.GetTileSafely(i, j - 1).type == TileType<BigTree_Purity>())
+            {
+                if (!CullingTree)
+                {
+                    CullingTree = true;
+
+                    if (t.frameX == 18)
+                        CullTree(i - 1, j);
+                    else
+                        CullTree(i, j);
+
+                    WorldGen.KillTile(i, j - 1);
+
+                    CullingTree = false;
+                }
+            }
+
+            Item.NewItem(new Vector2(i, j) * 16, drop, Main.rand.Next(1, 3)); //Drops extra wood to be proportional to vanilla tree wood loot
 
             if (t.frameX == 108 || t.frameX == 270) Framing.GetTileSafely(i + 1, j).frameX = 162; //Adjust frame for the middle branch
             if (t.frameX == 126 || t.frameX == 288) Framing.GetTileSafely(i - 1, j).frameX = 180; //Same as above, but the right side
@@ -224,29 +272,29 @@ namespace BigTree.Tiles
             if (t.frameX == 0 || t.frameX == 198 || t.frameX == 360) //Kill adjacent tiles if this is a trunk or the very base of the tree - left
             {
                 t.frameX++; //This makes sure there's no infinite loop without messing with anything
-                int[] killAdj = new int[] { 18, 216, 306, 342, 378, 414 };
-                if (killAdj.Any(x => Framing.GetTileSafely(i + 1, j).frameX == x)) //Kills adjacent tile, w/ conditions to avoid infinite loop
-                    WorldGen.KillTile(i + 1, j, false, false, false);
+                //int[] killAdj = new int[] { 18, 216, 306, 342, 378, 414 };
+                //if (killAdj.Any(x => Framing.GetTileSafely(i + 1, j).frameX == x)) //Kills adjacent tile, w/ conditions to avoid infinite loop
+                //    WorldGen.KillTile(i + 1, j, false, false, false);
                 CutTrunkFrames(0); //Cuts the trunk
             }
             if (t.frameX == 18 || t.frameX == 216 || t.frameX == 378) //This is the same as the if above - right
             {
                 t.frameX++;
-                int[] killAdj = new int[] { 0, 72, 198, 324, 360, 396 };
-                if (killAdj.Any(x => Framing.GetTileSafely(i - 1, j).frameX == x))
-                    WorldGen.KillTile(i - 1, j, false, false, false);
+                //int[] killAdj = new int[] { 0, 72, 198, 324, 360, 396 };
+                //if (killAdj.Any(x => Framing.GetTileSafely(i - 1, j).frameX == x))
+                //    WorldGen.KillTile(i - 1, j, false, false, false);
                 CutTrunkFrames(1);
             }
 
             if (t.frameX == 360) //Check #29907832: killed adjacent cut trunk
             {
                 t.frameX++;
-                if (Framing.GetTileSafely(i + 1, j).frameX == 378) WorldGen.KillTile(i + 1, j);
+                //if (Framing.GetTileSafely(i + 1, j).frameX == 378) WorldGen.KillTile(i + 1, j);
             }
             if (t.frameX == 378)
             {
                 t.frameX++;
-                if (Framing.GetTileSafely(i - 1, j).frameX == 360) WorldGen.KillTile(i - 1, j);
+                //if (Framing.GetTileSafely(i - 1, j).frameX == 360) WorldGen.KillTile(i - 1, j);
             }
 
             if (t.frameX == 234) //Drops loot & gores from the treetop

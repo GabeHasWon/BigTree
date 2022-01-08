@@ -17,18 +17,11 @@ namespace BigTree.Tiles
 
             TileObjectData.newTile.Width = 2;
             TileObjectData.newTile.Height = 2;
-            TileObjectData.newTile.CoordinateHeights = new int[2];
-
-            for (int k = 0; k < 2; k++)
-                TileObjectData.newTile.CoordinateHeights[k] = 16;
-
-            TileObjectData.newTile.UsesCustomCanPlace = true;
-            TileObjectData.newTile.CoordinateWidth = 16;
+            TileObjectData.newTile.CoordinateHeights = new int[2] { 16, 16 };
             TileObjectData.newTile.CoordinatePadding = 2;
             TileObjectData.newTile.RandomStyleRange = 2;
             TileObjectData.newTile.StyleHorizontal = false;
             TileObjectData.newTile.Origin = new Point16(0, 0);
-
             TileObjectData.addTile(Type);
 
             ModTranslation n = CreateMapEntryName();
