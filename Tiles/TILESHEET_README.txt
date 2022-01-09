@@ -25,4 +25,4 @@ Columns, from left to right:
 23: Cut trunk connecting to branch, left
 24: Cut trunk connecting to branch, right
 
-All have 3 variants for anti-monotony purposes.
+All have 3 variants for variety.
