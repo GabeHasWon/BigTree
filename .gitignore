@@ -3,3 +3,6 @@
 ################################################################################
 
 /.vs/BigTree/v16
+/bin/Debug/net45
+/obj/Debug/net45
+/.vs/BigTree/DesignTimeBuild

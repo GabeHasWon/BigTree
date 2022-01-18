@@ -12,7 +12,7 @@ namespace BigTree.Tiles
 {
     class BigTree_Purity : ModTile
     {
-        private const int LeafType = GoreID.TreeLeaf_Normal; //Set this to whatever custom type you want. If not a constant, do it in SetDefaults
+        private const int LeafType = GoreID.TreeLeaf_Normal; //Set this to whatever custom type you want.
         /// <summary>X/Y are equal to the width & height (respectively), in tiles, the top is - then, the width and height are the width/height in pixels
         /// Note: The tops are draw by the origin of the middle-bottom of the trunk, so generally, you'd want to use TreeTopSize.X / 2 for the left side (and same for the right side)</summary>
         private readonly Rectangle TreeTopSize = new Rectangle(24, 20, 360, 320);
@@ -38,6 +38,15 @@ namespace BigTree.Tiles
             Main.tileBlockLight[Type] = false; //Does not block light
             Main.tileFrameImportant[Type] = true; //Save frame when world is exited
             Main.tileAxe[Type] = true; //Cut with axe
+        }
+
+        public override void NumDust(int i, int j, bool fail, ref int num)
+        {
+            num = 3;
+
+            int fX = Framing.GetTileSafely(i, j).frameX;
+            if (fX == 450 || fX == 432)
+                num = 0;
         }
 
         /// <summary>Spawns a tree at x, y, origin being the left side of the trunk.</summary>
@@ -165,31 +174,49 @@ namespace BigTree.Tiles
                 return tile.active() && tile.type == Type && frm.Contains(tile.frameX);
             }
 
-            void CullTree(int x, int startY)
+            void CullTree(int x, int startY, bool leftOrigin = false)
             {
                 Tile tile = Framing.GetTileSafely(x, startY);
+                int y = startY;
+
                 while (tile.active() && tile.type == Type)
                 {
-                    WorldGen.KillTile(x, startY, false, false, false);
-                    WorldGen.KillTile(x + 1, startY, false, false, false);
-                    WorldGen.KillTile(x, startY, false, false, false); //I hate this. works tho
+                    if (y != startY)
+                    {
+                        WorldGen.KillTile(x, y, false, false, false);
+                        WorldGen.KillTile(x + 1, y, false, false, false);
+                        WorldGen.KillTile(x, y, false, false, false); //I hate this. works tho
+                    }
 
-                    startY--;
-                    tile = Framing.GetTileSafely(x, startY);
+                    y--;
+                    tile = Framing.GetTileSafely(x, y);
                 }
+
+                WorldGen.KillTile(x + (leftOrigin ? 1 : 0), startY, false, false, false);
             }
 
             //This if-else statement was written many months after this had all been done. It may deprecate any amount of code below. I don't care.
-            if ((FramedTreeTile(i - 1, j, 0, 198) || FramedTreeTile(i + 1, j, 18, 216)) && Framing.GetTileSafely(i, j - 1).type == TileType<BigTree_Purity>()) //Kill any tree tiles above self if both sides are cut
+            if (((FramedTreeTile(i, j, 360, 396) && FramedTreeTile(i + 1, j, 378, 414)) || (FramedTreeTile(i, j, 378, 414) && FramedTreeTile(i - 1, j, 360, 396))) && !CullingTree)
             {
-                if (t.frameX == 198) //Kill tile to the left if it's a branch
+                CullingTree = true;
+
+                if (t.frameX == 360 || t.frameX == 396)
+                    WorldGen.KillTile(i + 1, j, false, false, false);
+                else if (t.frameX == 378 || t.frameX == 414)
                     WorldGen.KillTile(i - 1, j, false, false, false);
-                if (t.frameX == 0 || t.frameX == 198)
+
+                CullingTree = false;
+            }
+            else if ((FramedTreeTile(i - 1, j, 0, 72, 198) || FramedTreeTile(i + 1, j, 18, 216, 306)) && Framing.GetTileSafely(i, j - 1).type == TileType<BigTree_Purity>()) //Kill any tree tiles above self if both sides are cut
+            {
+                if (t.frameX == 198 || t.frameX == 72) //Kill tile to the left if it's a branch
+                    WorldGen.KillTile(i - 1, j, false, false, false);
+                if (t.frameX == 0 || t.frameX == 72 || t.frameX == 198)
                     t.frameX = 432;
 
-                if (t.frameX == 216)
+                if (t.frameX == 216 || t.frameX == 306)
                     WorldGen.KillTile(i + 1, j, false, false, false);
-                if (t.frameX == 18 || t.frameX == 216)
+                if (t.frameX == 18 || t.frameX == 216 || t.frameX == 306)
                     t.frameX = 450;
 
                 fail = true;
@@ -201,12 +228,10 @@ namespace BigTree.Tiles
                 {
                     CullingTree = true;
 
-                    if (t.frameX == 18)
+                    if (t.frameX == 18 || t.frameX == 216 || t.frameX == 306)
                         CullTree(i - 1, j);
                     else
-                        CullTree(i, j);
-
-                    WorldGen.KillTile(i, j - 1);
+                        CullTree(i, j, true);
 
                     CullingTree = false;
                 }
@@ -272,29 +297,25 @@ namespace BigTree.Tiles
             if (t.frameX == 0 || t.frameX == 198 || t.frameX == 360) //Kill adjacent tiles if this is a trunk or the very base of the tree - left
             {
                 t.frameX++; //This makes sure there's no infinite loop without messing with anything
-                //int[] killAdj = new int[] { 18, 216, 306, 342, 378, 414 };
-                //if (killAdj.Any(x => Framing.GetTileSafely(i + 1, j).frameX == x)) //Kills adjacent tile, w/ conditions to avoid infinite loop
-                //    WorldGen.KillTile(i + 1, j, false, false, false);
                 CutTrunkFrames(0); //Cuts the trunk
             }
-            if (t.frameX == 18 || t.frameX == 216 || t.frameX == 378) //This is the same as the if above - right
+            else if (t.frameX == 18 || t.frameX == 216 || t.frameX == 378) //This is the same as the if above - right
             {
                 t.frameX++;
-                //int[] killAdj = new int[] { 0, 72, 198, 324, 360, 396 };
-                //if (killAdj.Any(x => Framing.GetTileSafely(i - 1, j).frameX == x))
-                //    WorldGen.KillTile(i - 1, j, false, false, false);
                 CutTrunkFrames(1);
             }
 
             if (t.frameX == 360) //Check #29907832: killed adjacent cut trunk
             {
                 t.frameX++;
-                //if (Framing.GetTileSafely(i + 1, j).frameX == 378) WorldGen.KillTile(i + 1, j);
+                if (Framing.GetTileSafely(i + 1, j).frameX == 378)
+                    WorldGen.KillTile(i + 1, j);
             }
-            if (t.frameX == 378)
+            else if (t.frameX == 378)
             {
                 t.frameX++;
-                //if (Framing.GetTileSafely(i - 1, j).frameX == 360) WorldGen.KillTile(i - 1, j);
+                if (Framing.GetTileSafely(i - 1, j).frameX == 360)
+                    WorldGen.KillTile(i - 1, j);
             }
 
             if (t.frameX == 234) //Drops loot & gores from the treetop
@@ -302,6 +323,7 @@ namespace BigTree.Tiles
                 Vector2 topPos = new Vector2(i - (TreeTopSize.X / 2), j - TreeTopSize.Y) * 16f;
                 Item.NewItem(topPos + new Vector2(Main.rand.Next(TreeTopSize.Width), Main.rand.Next(TreeTopSize.Height)), drop, Main.rand.Next(18, 25)); //Replace Acorn (below) with whatever if you want
                 Item.NewItem(topPos + new Vector2(Main.rand.Next(TreeTopSize.Width), Main.rand.Next(TreeTopSize.Height)), ItemID.Acorn, Main.rand.Next(7, 12)); //And obviously, add whatever extra items too if needed
+
                 int leaves = Main.rand.Next(20, 28); //Randomized leaf count
                 for (int l = 0; l < leaves; ++l) //Spawns leaf gores - note, these values are adjusted specifically for the size of the top; change TreeTopSize to adjust it easily.
                     Gore.NewGore(topPos + new Vector2(Main.rand.Next(TreeTopSize.Width), Main.rand.Next(TreeTopSize.Height)), new Vector2(), LeafType, Main.rand.Next(120, 160) * 0.01f);
@@ -321,6 +343,7 @@ namespace BigTree.Tiles
             {
                 Vector2 branchPos = new Vector2(i - BranchSize.X, j - (BranchSize.Y / 2)) * 16;
                 Item.NewItem(branchPos + new Vector2(Main.rand.Next(BranchSize.Width), Main.rand.Next(BranchSize.Height)), ItemID.Acorn, Main.rand.Next(3, 5));
+
                 int leaves = Main.rand.Next(12, 22);
                 for (int l = 0; l < leaves; ++l)
                     Gore.NewGore(branchPos + new Vector2(Main.rand.Next(BranchSize.Width), Main.rand.Next(BranchSize.Height)), new Vector2(), LeafType, Main.rand.Next(90, 130) * 0.01f);
@@ -329,6 +352,7 @@ namespace BigTree.Tiles
             {
                 Vector2 branchPos = new Vector2(i, j - (BranchSize.Y / 2)) * 16;
                 Item.NewItem(branchPos + new Vector2(Main.rand.Next(BranchSize.Width), Main.rand.Next(BranchSize.Height)), ItemID.Acorn, Main.rand.Next(3, 5));
+
                 int leaves = Main.rand.Next(12, 22);
                 for (int l = 0; l < leaves; ++l)
                     Gore.NewGore(branchPos + new Vector2(Main.rand.Next(BranchSize.Width), Main.rand.Next(BranchSize.Height)), new Vector2(), LeafType, Main.rand.Next(90, 130) * 0.01f);
